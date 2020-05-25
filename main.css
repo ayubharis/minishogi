@@ -1,0 +1,20 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+canvas {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@font-face {
+    font-family: 'Shogi';
+    src: url(fonts/hkgyoprokk.ttf);
+}
+
+@font-face {
+    font-family: 'Shogi Cursive';
+    src: url(fonts/hksoukk.ttf);
+}
