@@ -21,17 +21,17 @@ const lineWidth = boardSize / 180;
 let pieceSize = boardSpacing * 3 / 4;
 
 let boardImg = new Image();
-boardImg.src = 'board.jpg';
+boardImg.src = '/img/board.jpg';
 boardImg.onload = render;
 
 let pieceImg = new Image();
-pieceImg.src = 'piece.jpg';
+pieceImg.src = '/img/piece.jpg';
 pieceImg.onload = render;
 
-let font = new FontFace('Shogi', 'url(fonts/hkgyoprokk.ttf)');
+let font = new FontFace('Shogi', 'url(/font/hkgyoprokk.ttf)');
 font.load().then(render);
 
-let cursiveFont = new FontFace('Shogi Cursive', 'url(fonts/hksoukk.ttf)');
+let cursiveFont = new FontFace('Shogi Cursive', 'url(/font/hksoukk.ttf)');
 cursiveFont.load().then(render);
 
 function render() {

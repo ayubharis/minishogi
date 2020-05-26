@@ -11,10 +11,10 @@ canvas {
 
 @font-face {
     font-family: 'Shogi';
-    src: url(fonts/hkgyoprokk.ttf);
+    src: url(/font/hkgyoprokk.ttf);
 }
 
 @font-face {
     font-family: 'Shogi Cursive';
-    src: url(fonts/hksoukk.ttf);
+    src: url(/font/hksoukk.ttf);
 }
