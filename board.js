@@ -1,4 +1,4 @@
-import { Piece } from './piece.js';
+import { Piece, canPromote } from './piece.js';
 
 const kingMoveset = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
 const dragonMoveset = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -22,21 +22,34 @@ export function activePiece(board) {
     return board.activePiece.x !== -1 || board.activePiece.y !== -1;
 }
 
-function checkPromote(board, x, y) {
-    let piece = pieceAt(board, x, y);
-    //if (piece.type === 'p') {
-        if (y === (piece.color === 'b' ? 0 : 4)) {
-            console.log(`promoting ${piece.type}`);
-            piece.promoted = true;
-        }
-    //}
+export function promote(board, prompt = true, promoted = true) {
+    let piece = pieceAt(board, board.activePiece.x, board.activePiece.y);
+    if (!prompt || piece.type === 'p') {
+        piece.promoted = promoted;
+        board.promoteWait = false;
+        setActive(board, board.activePiece.x, board.activePiece.y);
+        checkCheckmate(board);
+    } else if (canPromote(piece)) {
+        board.promoteWait = true;
+    }
 }
 
-export function movePiece(board, pieceX, pieceY, x, y) {
+export function movePiece(board, pieceX, pieceY, x, y, test = false) {
     let piece = pieceAt(board, pieceX, pieceY);
+    let capturedPiece = pieceAt(board, x, y);
+    if (capturedPiece !== 0) {
+        board.inHand[piece.color][capturedPiece.type]++;
+    }
     setPiece(board, x, y, piece);
     setPiece(board, pieceX, pieceY, 0);
-    checkPromote(board, x, y);
+    if (!test) {
+        if (!piece.promoted && (y === (piece.color === 'b' ? 0 : 4) || pieceY === (piece.color === 'b' ? 0 : 4))) {
+            setActive(board, x, y);
+            promote(board);
+        } else {
+            checkCheckmate(board);
+        }
+    }
 }
 
 export function checkCheckmate(board) {
@@ -94,7 +107,7 @@ function inCheckmate(board, color) {
     return true;
 }
 
-export function legalMoves(board, pieceX, pieceY, strict=true) {
+export function legalMoves(board, pieceX, pieceY, strict = true) {
     let piece = pieceAt(board, pieceX, pieceY);
 
     // Select movesets
@@ -162,7 +175,7 @@ export function legalMoves(board, pieceX, pieceY, strict=true) {
     let legalMoves = []
     for (let [x, y] of moves) {
         let moveBoard = JSON.parse(JSON.stringify(board));
-        movePiece(moveBoard, pieceX, pieceY, x, y);
+        movePiece(moveBoard, pieceX, pieceY, x, y, true);
         if (!inCheck(moveBoard, piece.color)) {
             legalMoves.push([x, y]);
         }
@@ -181,8 +194,24 @@ class Board {
             [new Piece('p', 'b'), 0, 0, 0, 0],
             [new Piece('k', 'b'), new Piece('g', 'b'), new Piece('s', 'b'), new Piece('b', 'b'), new Piece('r', 'b')]
         ];
-        this.blackInHand = [];
-        this.whiteInHand = [];
+        this.inHand = {
+            'b': {
+                'k': 0,
+                'r': 0,
+                'b': 0,
+                'g': 0,
+                's': 0,
+                'p': 0
+            },
+            'w': {
+                'k': 0,
+                'r': 0,
+                'b': 0,
+                'g': 0,
+                's': 0,
+                'p': 0
+            }
+        };
         this.activePiece = { x: -1, y: -1 };
         this.gameOver = false;
         this.promoteWait = false;

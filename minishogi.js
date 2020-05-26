@@ -1,7 +1,8 @@
-import { pieceAt, board, activePiece, movePiece, setActive, legalMoves, checkCheckmate } from './board.js';
+import { pieceAt, board, activePiece, movePiece, setActive, legalMoves, promote } from './board.js';
 import { getName } from './piece.js';
 
 const canvas = document.getElementById('game');
+const body = document.getElementById('body');
 
 canvas.width = 640 * window.devicePixelRatio;
 canvas.height = 480 * window.devicePixelRatio;
@@ -34,9 +35,9 @@ let cursiveFont = new FontFace('Shogi Cursive', 'url(fonts/hksoukk.ttf)');
 cursiveFont.load().then(render);
 
 function render() {
-    console.log("rendering")
-
+    // background
     ctx.fillStyle = '#E6E6EA';
+    body.style.backgroundColor = '#E6E6EA';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     // board
@@ -69,6 +70,10 @@ function render() {
 
     for (let y = 0; y < board.N; y++) {
         for (let x = 0; x < board.N; x++) {
+            if (board.promoteWait && board.activePiece.x === x && board.activePiece.y === y) {
+                continue;
+            }
+
             if (pieceAt(board, x, y) === 0) {
                 continue;
             }
@@ -106,8 +111,6 @@ function render() {
 
             // Piece
             ctx.save();
-            ctx.fillStyle = '#F5F5DC';
-            ctx.lineJoin = 'round';
             ctx.beginPath();
             ctx.moveTo(-pieceSize / 2, pieceSize / 2);
             ctx.lineTo(pieceSize / 2, pieceSize / 2);
@@ -143,8 +146,115 @@ function render() {
         }
     }
 
+    if (board.promoteWait) {
+        let promotePiece = pieceAt(board, board.activePiece.x, board.activePiece.y);
+
+        ctx.globalAlpha = 0.5;
+
+        ctx.fillStyle = '#000000';
+        body.style.backgroundColor = '#737375';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+        ctx.globalAlpha = 1.0;
+
+        let originX = boardX + boardMargin + board.activePiece.x * boardSpacing + boardSpacing / 2;
+        let originY = boardY + boardMargin + board.activePiece.y * boardSpacing + boardSpacing / 2;
+
+        ctx.translate(originX, originY);
+
+        if (promotePiece.color === 'w') {
+            ctx.rotate(Math.PI);
+        }
+
+        // Piece shadow
+        ctx.fillStyle = '#000000';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = lineWidth;
+        ctx.shadowOffsetY = lineWidth;
+        ctx.beginPath();
+        ctx.moveTo(-pieceSize / 2, pieceSize / 2);
+        ctx.lineTo(pieceSize / 2, pieceSize / 2);
+        ctx.lineTo(pieceSize * 5 / 12, -pieceSize / 3);
+        ctx.lineTo(0, -pieceSize / 2);
+        ctx.lineTo(-pieceSize * 5 / 12, -pieceSize / 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // Piece
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(-pieceSize / 2, pieceSize / 2);
+        ctx.lineTo(pieceSize / 2, pieceSize / 2);
+        ctx.lineTo(pieceSize * 5 / 12, -pieceSize / 3);
+        ctx.lineTo(0, -pieceSize / 2);
+        ctx.lineTo(-pieceSize * 5 / 12, -pieceSize / 3);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(pieceImg, -pieceSize / 2, -pieceSize / 2, pieceSize, pieceSize);
+        ctx.restore();
+
+        // Label
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `${pieceSize * 5 / 8}px 'Shogi'`;
+        ctx.fillStyle = '#000000';
+        ctx.fillText(getName(promotePiece), 0, pieceSize / 12);
+
+        promotePiece.promoted = true;
+        ctx.translate(0, -boardSpacing);
+
+        // Promoted piece shadow
+        ctx.fillStyle = '#000000';
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = lineWidth;
+        ctx.shadowOffsetY = lineWidth;
+        ctx.beginPath();
+        ctx.moveTo(-pieceSize / 2, pieceSize / 2);
+        ctx.lineTo(pieceSize / 2, pieceSize / 2);
+        ctx.lineTo(pieceSize * 5 / 12, -pieceSize / 3);
+        ctx.lineTo(0, -pieceSize / 2);
+        ctx.lineTo(-pieceSize * 5 / 12, -pieceSize / 3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // Promoted piece
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(-pieceSize / 2, pieceSize / 2);
+        ctx.lineTo(pieceSize / 2, pieceSize / 2);
+        ctx.lineTo(pieceSize * 5 / 12, -pieceSize / 3);
+        ctx.lineTo(0, -pieceSize / 2);
+        ctx.lineTo(-pieceSize * 5 / 12, -pieceSize / 3);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(pieceImg, -pieceSize / 2, -pieceSize / 2, pieceSize, pieceSize);
+        ctx.restore();
+
+        // Promoted label
+        ctx.font = `${pieceSize * 5 / 8}px 'Shogi Cursive'`;
+        ctx.fillStyle = '#FF0000';
+        ctx.fillText(getName(promotePiece), 0, pieceSize / 12);
+
+        ctx.translate(0, boardSpacing);
+        promotePiece.promoted = false;
+
+        if (promotePiece.color === 'w') {
+            ctx.rotate(-Math.PI);
+        }
+
+        ctx.translate(-originX, -originY);
+    }
+
     // Legal moves
-    if (activePiece(board)) {
+    if (activePiece(board) && !board.promoteWait) {
         for (let [legalX, legalY] of legalMoves(board, board.activePiece.x, board.activePiece.y)) {
             let originX = boardX + boardMargin + legalX * boardSpacing + boardSpacing / 2;
             let originY = boardY + boardMargin + legalY * boardSpacing + boardSpacing / 2;
@@ -168,9 +278,10 @@ function render() {
     }
 
     if (board.gameOver) {
-        ctx.globalAlpha = 0.75;
+        ctx.globalAlpha = 0.5;
 
         ctx.fillStyle = '#000000';
+        body.style.backgroundColor = '#737375';
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
         ctx.globalAlpha = 1.0;
@@ -180,12 +291,7 @@ function render() {
 
         ctx.translate(originX, originY);
 
-        ctx.shadowColor = 'gray';
-        ctx.shadowBlur = 20;
-
         ctx.drawImage(pieceImg, -boardSize * 3 / 8, -boardSize / 4, boardSize * 3 / 4, boardSize / 2);
-
-        ctx.shadowBlur = 0;
 
         ctx.fillStyle = '#000000';
         ctx.textAlign = 'center';
@@ -202,11 +308,18 @@ canvas.onmousemove = (event) => {
     let canvasY = (event.pageY - canvas.offsetTop - canvas.clientTop) * window.devicePixelRatio;
     let pieceX = Math.floor((canvasX - boardX - boardMargin) / boardSpacing);
     let pieceY = Math.floor((canvasY - boardY - boardMargin) / boardSpacing);
-    let x = (canvasX - boardX - boardMargin) % boardSpacing - boardSpacing / 2;
-    let y = (canvasY - boardY - boardMargin) % boardSpacing - boardSpacing / 2;
-    if (pieceX >= 0 && pieceX < board.N && pieceY >= 0 && pieceY < board.N) {
-        if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
-            if (!board.gameOver) {
+    let x = (canvasX - boardX - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
+    let y = (canvasY - boardY - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
+    if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
+        if (board.promoteWait) {
+            let direction = pieceAt(board, board.activePiece.x, board.activePiece.y).color === 'b' ? -1 : 1;
+            if (board.activePiece.x === pieceX && (board.activePiece.y === pieceY || board.activePiece.y + direction === pieceY)) {
+                canvas.style.cursor = 'pointer';
+                return;
+            }
+        }
+        if (!board.promoteWait && !board.gameOver) {
+            if (pieceX >= 0 && pieceX < board.N && pieceY >= 0 && pieceY < board.N) {
                 if (pieceAt(board, pieceX, pieceY) !== 0 || (activePiece(board) && legalMoves(board, board.activePiece.x, board.activePiece.y).some((move) => move[0] === pieceX && move[1] === pieceY))) {
                     canvas.style.cursor = 'pointer';
                     return;
@@ -222,16 +335,29 @@ canvas.onclick = (event) => {
     let canvasY = (event.pageY - canvas.offsetTop - canvas.clientTop) * window.devicePixelRatio;
     let pieceX = Math.floor((canvasX - boardX - boardMargin) / boardSpacing);
     let pieceY = Math.floor((canvasY - boardY - boardMargin) / boardSpacing);
-    let x = (canvasX - boardX - boardMargin) % boardSpacing - boardSpacing / 2;
-    let y = (canvasY - boardY - boardMargin) % boardSpacing - boardSpacing / 2;
-    if (pieceX >= 0 && pieceX < board.N && pieceY >= 0 && pieceY < board.N) {
-        if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
-            if (!board.gameOver) {
+    let x = (canvasX - boardX - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
+    let y = (canvasY - boardY - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
+    if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
+        if (board.promoteWait) {
+            let direction = pieceAt(board, board.activePiece.x, board.activePiece.y).color === 'b' ? -1 : 1;
+            if (board.activePiece.x === pieceX) {
+                if (board.activePiece.y === pieceY) {
+                    promote(board, false, false);
+                    render();
+                    return;
+                } else if (board.activePiece.y + direction === pieceY) {
+                    promote(board, false);
+                    render();
+                    return;
+                }
+            }
+        }
+        if (!board.promoteWait && !board.gameOver) {
+            if (pieceX >= 0 && pieceX < board.N && pieceY >= 0 && pieceY < board.N) {
                 if (activePiece(board) && legalMoves(board, board.activePiece.x, board.activePiece.y).some((move) => move[0] === pieceX && move[1] === pieceY)) {
                     let startX = board.activePiece.x, startY = board.activePiece.y;
-                    setActive(board, board.activePiece.x, board.activePiece.y);
+                    setActive(board, startX, startY);
                     movePiece(board, startX, startY, pieceX, pieceY);
-                    checkCheckmate(board);
                     render();
                     return;
                 }
