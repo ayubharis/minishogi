@@ -34,6 +34,8 @@ font.load().then(render);
 let cursiveFont = new FontFace('Shogi Cursive', 'url(/font/hksoukk.ttf)');
 cursiveFont.load().then(render);
 
+let dismissed = false;
+
 function render() {
     // background
     ctx.fillStyle = '#E6E6EA';
@@ -277,7 +279,7 @@ function render() {
         }
     }
 
-    if (board.gameOver) {
+    if (board.gameOver && !dismissed) {
         ctx.globalAlpha = 0.5;
 
         ctx.fillStyle = '#000000';
@@ -291,7 +293,14 @@ function render() {
 
         ctx.translate(originX, originY);
 
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 20;
+        ctx.shadowOffsetX = lineWidth;
+        ctx.shadowOffsetY = lineWidth;
         ctx.drawImage(pieceImg, -boardSize * 3 / 8, -boardSize / 4, boardSize * 3 / 4, boardSize / 2);
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
 
         ctx.fillStyle = '#000000';
         ctx.textAlign = 'center';
@@ -303,13 +312,18 @@ function render() {
     }
 }
 
-canvas.onmousemove = (event) => {
+function updateCursor(event) {
     let canvasX = (event.pageX - canvas.offsetLeft - canvas.clientLeft) * window.devicePixelRatio;
     let canvasY = (event.pageY - canvas.offsetTop - canvas.clientTop) * window.devicePixelRatio;
     let pieceX = Math.floor((canvasX - boardX - boardMargin) / boardSpacing);
     let pieceY = Math.floor((canvasY - boardY - boardMargin) / boardSpacing);
     let x = (canvasX - boardX - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
     let y = (canvasY - boardY - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
+    if (!dismissed && board.gameOver && canvasX >= boardX + boardSize / 8 && canvasX < boardX + boardSize * 7 / 8 &&
+        canvasY >= boardY + boardSize / 4 && canvasY < boardY + boardSize * 3 / 4) {
+        canvas.style.cursor = 'pointer';
+        return;
+    }
     if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
         if (board.promoteWait) {
             let direction = pieceAt(board, board.activePiece.x, board.activePiece.y).color === 'b' ? -1 : 1;
@@ -330,13 +344,20 @@ canvas.onmousemove = (event) => {
     canvas.style.cursor = 'default';
 }
 
-canvas.onclick = (event) => {
+function handleClick(event) {
     let canvasX = (event.pageX - canvas.offsetLeft - canvas.clientLeft) * window.devicePixelRatio;
     let canvasY = (event.pageY - canvas.offsetTop - canvas.clientTop) * window.devicePixelRatio;
     let pieceX = Math.floor((canvasX - boardX - boardMargin) / boardSpacing);
     let pieceY = Math.floor((canvasY - boardY - boardMargin) / boardSpacing);
     let x = (canvasX - boardX - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
     let y = (canvasY - boardY - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
+    if (!dismissed && board.gameOver && canvasX >= boardX + boardSize / 8 && canvasX < boardX + boardSize * 7 / 8 &&
+        canvasY >= boardY + boardSize / 4 && canvasY < boardY + boardSize * 3 / 4) {
+        dismissed = true;
+        render();
+        updateCursor(event);
+        return;
+    }
     if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
         if (board.promoteWait) {
             let direction = pieceAt(board, board.activePiece.x, board.activePiece.y).color === 'b' ? -1 : 1;
@@ -344,10 +365,12 @@ canvas.onclick = (event) => {
                 if (board.activePiece.y === pieceY) {
                     promote(board, false, false);
                     render();
+                    updateCursor(event);
                     return;
                 } else if (board.activePiece.y + direction === pieceY) {
                     promote(board, false);
                     render();
+                    updateCursor(event);
                     return;
                 }
             }
@@ -359,14 +382,20 @@ canvas.onclick = (event) => {
                     setActive(board, startX, startY);
                     movePiece(board, startX, startY, pieceX, pieceY);
                     render();
+                    updateCursor(event);
                     return;
                 }
                 if (pieceAt(board, pieceX, pieceY) !== 0) {
                     setActive(board, pieceX, pieceY);
                     render();
+                    updateCursor(event);
                     return;
                 }
             }
         }
     }
 }
+
+canvas.onmousemove = updateCursor;
+
+canvas.onclick = handleClick;
