@@ -1,23 +1,27 @@
-import { pieceAt, board, activePiece, movePiece, setActive, legalMoves, promote } from './board.js';
-import { getName } from './piece.js';
+import { pieceAt, board, pieceSelected, movePiece, setActive, legalMoves, legalDrops, promote, dropPiece, activePiece, dropSelected, moveDropPiece } from './board.js';
+import { getName, Piece } from './piece.js';
 
 const canvas = document.getElementById('game');
 const body = document.getElementById('body');
 
-canvas.width = 640 * window.devicePixelRatio;
-canvas.height = 480 * window.devicePixelRatio;
+let canvasWidth = 1280, canvasHeight = 640;
 
-canvas.style.width = "640px";
-canvas.style.height = '480px';
+canvas.style.width = `${canvasWidth}px`;
+canvas.style.height = `${canvasHeight}px`;
+
+canvasWidth *= window.devicePixelRatio;
+canvasHeight *= window.devicePixelRatio;
+
+canvas.width = canvasWidth;
+canvas.height = canvasHeight;
 
 const ctx = canvas.getContext('2d');
-
-const canvasWidth = canvas.width, canvasHeight = canvas.height;
 const boardSize = canvasHeight * 3 / 4;
 const boardX = (canvasWidth - boardSize) / 2, boardY = (canvasHeight - boardSize) / 2;
 const boardMargin = boardSize / 18;
 const boardSpacing = (boardSize - boardMargin * 2) / board.N;
 const lineWidth = boardSize / 180;
+const inHandX = boardX + boardSize, inHandY = boardY;
 let pieceSize = boardSpacing * 3 / 4;
 
 let boardImg = new Image();
@@ -38,8 +42,8 @@ let dismissed = false;
 
 function render() {
     // background
-    ctx.fillStyle = '#E6E6EA';
-    body.style.backgroundColor = '#E6E6EA';
+    ctx.fillStyle = '#FFFFFF';
+    body.style.backgroundColor = '#FFFFFF';
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
     // board
@@ -70,6 +74,82 @@ function render() {
         ctx.stroke();
     }
 
+    // in hand
+    for (let color of ['b', 'w']) {
+        for (let y = 0; y < board.pieceNames.length; y++) {
+            let pieceInHand = new Piece(board.pieceNames[y], color);
+            for (let x = 0; x < board.inHand[color][board.pieceNames[y]]; x++) {
+                if (color === 'w') {
+                    ctx.translate(canvasWidth / 2, canvasHeight / 2);
+                    ctx.rotate(Math.PI);
+                    ctx.translate(-canvasWidth / 2, -canvasHeight / 2);
+                }
+
+                let originX = inHandX + boardMargin + x * boardSpacing + boardSpacing / 2;
+                let originY = inHandY + boardMargin + y * boardSpacing + boardSpacing / 2;
+
+                ctx.translate(originX, originY);
+
+                if (x + board.N === board.activePiece.x &&
+                    ((color === 'b' && y === board.activePiece.y) ||
+                        (color === 'w' && y + board.pieceNames.length === board.activePiece.y))) {
+                    pieceSize = boardSpacing * 7 / 8;
+                }
+
+                // Piece shadow
+                ctx.fillStyle = '#FFFFFF';
+                ctx.beginPath();
+                ctx.moveTo(-pieceSize / 2, pieceSize / 2);
+                ctx.lineTo(pieceSize / 2, pieceSize / 2);
+                ctx.lineTo(pieceSize * 5 / 12, -pieceSize / 3);
+                ctx.lineTo(0, -pieceSize / 2);
+                ctx.lineTo(-pieceSize * 5 / 12, -pieceSize / 3);
+                ctx.closePath();
+                ctx.shadowBlur = 20;
+                ctx.shadowOffsetX = lineWidth;
+                ctx.shadowOffsetY = lineWidth;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+
+                // Piece
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(-pieceSize / 2, pieceSize / 2);
+                ctx.lineTo(pieceSize / 2, pieceSize / 2);
+                ctx.lineTo(pieceSize * 5 / 12, -pieceSize / 3);
+                ctx.lineTo(0, -pieceSize / 2);
+                ctx.lineTo(-pieceSize * 5 / 12, -pieceSize / 3);
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(pieceImg, -pieceSize / 2, -pieceSize / 2, pieceSize, pieceSize);
+                ctx.restore();
+
+                // Label
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = `${pieceSize * 5 / 8}px 'Shogi'`;
+                ctx.fillStyle = '#000000';
+                ctx.fillText(getName(pieceInHand), 0, pieceSize / 12);
+
+                if (x + board.N === board.activePiece.x &&
+                    ((color === 'b' && y === board.activePiece.y) ||
+                        (color === 'w' && y + board.pieceNames.length === board.activePiece.y))) {
+                    pieceSize = boardSpacing * 3 / 4;
+                }
+
+                ctx.translate(-originX, -originY);
+
+                if (color === 'w') {
+                    ctx.translate(canvasWidth / 2, canvasHeight / 2);
+                    ctx.rotate(-Math.PI);
+                    ctx.translate(-canvasWidth / 2, -canvasHeight / 2);
+                }
+            }
+        }
+    }
+
     for (let y = 0; y < board.N; y++) {
         for (let x = 0; x < board.N; x++) {
             if (board.promoteWait && board.activePiece.x === x && board.activePiece.y === y) {
@@ -94,7 +174,7 @@ function render() {
             }
 
             // Piece shadow
-            ctx.fillStyle = '#000000';
+            ctx.fillStyle = '#FFFFFF';
             ctx.beginPath();
             ctx.moveTo(-pieceSize / 2, pieceSize / 2);
             ctx.lineTo(pieceSize / 2, pieceSize / 2);
@@ -102,8 +182,7 @@ function render() {
             ctx.lineTo(0, -pieceSize / 2);
             ctx.lineTo(-pieceSize * 5 / 12, -pieceSize / 3);
             ctx.closePath();
-            ctx.shadowColor = 'black';
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 20;
             ctx.shadowOffsetX = lineWidth;
             ctx.shadowOffsetY = lineWidth;
             ctx.fill();
@@ -149,12 +228,12 @@ function render() {
     }
 
     if (board.promoteWait) {
-        let promotePiece = pieceAt(board, board.activePiece.x, board.activePiece.y);
+        let promotePiece = activePiece(board);
 
         ctx.globalAlpha = 0.5;
 
         ctx.fillStyle = '#000000';
-        body.style.backgroundColor = '#737375';
+        body.style.backgroundColor = '#808080';
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
         ctx.globalAlpha = 1.0;
@@ -169,9 +248,8 @@ function render() {
         }
 
         // Piece shadow
-        ctx.fillStyle = '#000000';
-        ctx.shadowColor = 'black';
-        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.shadowBlur = 20;
         ctx.shadowOffsetX = lineWidth;
         ctx.shadowOffsetY = lineWidth;
         ctx.beginPath();
@@ -210,9 +288,8 @@ function render() {
         ctx.translate(0, -boardSpacing);
 
         // Promoted piece shadow
-        ctx.fillStyle = '#000000';
-        ctx.shadowColor = 'black';
-        ctx.shadowBlur = 8;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.shadowBlur = 20;
         ctx.shadowOffsetX = lineWidth;
         ctx.shadowOffsetY = lineWidth;
         ctx.beginPath();
@@ -256,7 +333,23 @@ function render() {
     }
 
     // Legal moves
-    if (activePiece(board) && !board.promoteWait) {
+    if (dropSelected(board)) {
+        for (let [legalX, legalY] of legalDrops(board, dropPiece(board))) {
+            let originX = boardX + boardMargin + legalX * boardSpacing + boardSpacing / 2;
+            let originY = boardY + boardMargin + legalY * boardSpacing + boardSpacing / 2;
+
+            ctx.translate(originX, originY);
+
+            ctx.globalAlpha = 0.5;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(0, 0, boardSpacing / 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            ctx.translate(-originX, -originY);
+        }
+    } else if (pieceSelected(board) && !board.promoteWait) {
         for (let [legalX, legalY] of legalMoves(board, board.activePiece.x, board.activePiece.y)) {
             let originX = boardX + boardMargin + legalX * boardSpacing + boardSpacing / 2;
             let originY = boardY + boardMargin + legalY * boardSpacing + boardSpacing / 2;
@@ -265,7 +358,7 @@ function render() {
 
             ctx.globalAlpha = 0.5;
             if (pieceAt(board, legalX, legalY) != 0) {
-                ctx.fillStyle = '#800000';
+                ctx.fillStyle = '#000000';
                 ctx.fillRect(-boardSpacing / 2, -boardSpacing / 2, boardSpacing, boardSpacing);
             } else {
                 ctx.fillStyle = '#FFFFFF';
@@ -283,7 +376,7 @@ function render() {
         ctx.globalAlpha = 0.5;
 
         ctx.fillStyle = '#000000';
-        body.style.backgroundColor = '#737375';
+        body.style.backgroundColor = '#808080';
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
         ctx.globalAlpha = 1.0;
@@ -293,7 +386,6 @@ function render() {
 
         ctx.translate(originX, originY);
 
-        ctx.shadowColor = 'black';
         ctx.shadowBlur = 20;
         ctx.shadowOffsetX = lineWidth;
         ctx.shadowOffsetY = lineWidth;
@@ -313,31 +405,51 @@ function render() {
 }
 
 function updateCursor(event) {
+    if (dismissed) {
+        canvas.style.cursor = 'default';
+        return;
+    }
     let canvasX = (event.pageX - canvas.offsetLeft - canvas.clientLeft) * window.devicePixelRatio;
     let canvasY = (event.pageY - canvas.offsetTop - canvas.clientTop) * window.devicePixelRatio;
     let pieceX = Math.floor((canvasX - boardX - boardMargin) / boardSpacing);
     let pieceY = Math.floor((canvasY - boardY - boardMargin) / boardSpacing);
     let x = (canvasX - boardX - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
     let y = (canvasY - boardY - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
-    if (!dismissed && board.gameOver && canvasX >= boardX + boardSize / 8 && canvasX < boardX + boardSize * 7 / 8 &&
-        canvasY >= boardY + boardSize / 4 && canvasY < boardY + boardSize * 3 / 4) {
-        canvas.style.cursor = 'pointer';
-        return;
+    let color = 'b';
+    if (canvasX < canvasWidth / 2) {
+        canvasX = canvasWidth - canvasX;
+        canvasY = canvasHeight - canvasY;
+        color = 'w';
     }
-    if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
+    let dropInPieceX = Math.floor((canvasX - inHandX - boardMargin) / boardSpacing);
+    let dropInPieceY = Math.floor((canvasY - inHandY - boardMargin) / boardSpacing);
+    let dropInX = ((canvasX - inHandX - boardMargin) % boardSpacing + boardSpacing) % boardSpacing - boardSpacing / 2;
+    let dropInY = ((canvasY - inHandY - boardMargin) % boardSpacing + boardSpacing) % boardSpacing - boardSpacing / 2;
+    if (board.gameOver) {
+        if (canvasX >= boardX + boardSize / 8 && canvasX < boardX + boardSize * 7 / 8 &&
+            canvasY >= boardY + boardSize / 4 && canvasY < boardY + boardSize * 3 / 4) {
+            canvas.style.cursor = 'pointer';
+            return;
+        }
+    } else if (dropInPieceX >= 0 && dropInPieceY >= 0 && dropInPieceY < board.pieceNames.length &&
+        dropInX >= -pieceSize / 2 && dropInX < pieceSize / 2 && dropInY >= -pieceSize / 2 && dropInY < pieceSize / 2) {
+        if (dropInPieceX < board.inHand[color][board.pieceNames[dropInPieceY]]) {
+            canvas.style.cursor = 'pointer';
+            return;
+        }
+    } else if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
         if (board.promoteWait) {
-            let direction = pieceAt(board, board.activePiece.x, board.activePiece.y).color === 'b' ? -1 : 1;
+            let direction = activePiece(board).color === 'b' ? -1 : 1;
             if (board.activePiece.x === pieceX && (board.activePiece.y === pieceY || board.activePiece.y + direction === pieceY)) {
                 canvas.style.cursor = 'pointer';
                 return;
             }
-        }
-        if (!board.promoteWait && !board.gameOver) {
-            if (pieceX >= 0 && pieceX < board.N && pieceY >= 0 && pieceY < board.N) {
-                if (pieceAt(board, pieceX, pieceY) !== 0 || (activePiece(board) && legalMoves(board, board.activePiece.x, board.activePiece.y).some((move) => move[0] === pieceX && move[1] === pieceY))) {
-                    canvas.style.cursor = 'pointer';
-                    return;
-                }
+        } else if (pieceX >= 0 && pieceX < board.N && pieceY >= 0 && pieceY < board.N) {
+            if (pieceAt(board, pieceX, pieceY) !== 0
+            || (dropSelected(board) && legalDrops(board, dropPiece(board)).some((move) => move[0] === pieceX && move[1] === pieceY))
+            || (pieceSelected(board) && legalMoves(board, board.activePiece.x, board.activePiece.y).some((move) => move[0] === pieceX && move[1] === pieceY))) {
+                canvas.style.cursor = 'pointer';
+                return;
             }
         }
     }
@@ -345,22 +457,48 @@ function updateCursor(event) {
 }
 
 function handleClick(event) {
+    if (dismissed) {
+        return;
+    }
     let canvasX = (event.pageX - canvas.offsetLeft - canvas.clientLeft) * window.devicePixelRatio;
     let canvasY = (event.pageY - canvas.offsetTop - canvas.clientTop) * window.devicePixelRatio;
     let pieceX = Math.floor((canvasX - boardX - boardMargin) / boardSpacing);
     let pieceY = Math.floor((canvasY - boardY - boardMargin) / boardSpacing);
-    let x = (canvasX - boardX - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
-    let y = (canvasY - boardY - boardMargin + boardSpacing) % boardSpacing - boardSpacing / 2;
-    if (!dismissed && board.gameOver && canvasX >= boardX + boardSize / 8 && canvasX < boardX + boardSize * 7 / 8 &&
-        canvasY >= boardY + boardSize / 4 && canvasY < boardY + boardSize * 3 / 4) {
-        dismissed = true;
-        render();
-        updateCursor(event);
-        return;
+    let x = ((canvasX - boardX - boardMargin) % boardSpacing + boardSpacing) % boardSpacing - boardSpacing / 2;
+    let y = ((canvasY - boardY - boardMargin) % boardSpacing + boardSpacing) % boardSpacing - boardSpacing / 2;
+    let color = 'b';
+    if (canvasX < canvasWidth / 2) {
+        canvasX = canvasWidth - canvasX;
+        canvasY = canvasHeight - canvasY;
+        color = 'w';
     }
-    if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
+    let dropInPieceX = Math.floor((canvasX - inHandX - boardMargin) / boardSpacing);
+    let dropInPieceY = Math.floor((canvasY - inHandY - boardMargin) / boardSpacing);
+    let dropInX = ((canvasX - inHandX - boardMargin) % boardSpacing + boardSpacing) % boardSpacing - boardSpacing / 2;
+    let dropInY = ((canvasY - inHandY - boardMargin) % boardSpacing + boardSpacing) % boardSpacing - boardSpacing / 2;
+    if (board.gameOver) {
+        if (canvasX >= boardX + boardSize / 8 && canvasX < boardX + boardSize * 7 / 8 &&
+            canvasY >= boardY + boardSize / 4 && canvasY < boardY + boardSize * 3 / 4) {
+            dismissed = true;
+            render();
+            updateCursor(event);
+            return;
+        }
+    } else if (dropInPieceX >= 0 && dropInPieceY >= 0 && dropInPieceY < board.pieceNames.length &&
+        dropInX >= -pieceSize / 2 && dropInX < pieceSize / 2 && dropInY >= -pieceSize / 2 && dropInY < pieceSize / 2) {
+        if (dropInPieceX < board.inHand[color][board.pieceNames[dropInPieceY]]) {
+            // Set drop piece active (render legal drops)
+            if (color === 'b') {
+                setActive(board, dropInPieceX + board.N, dropInPieceY);
+            } else {
+                setActive(board, dropInPieceX + board.N, dropInPieceY + board.pieceNames.length);
+            }
+            render();
+            return;
+        }
+    } else if (x >= -pieceSize / 2 && x < pieceSize / 2 && y >= -pieceSize / 2 && y < pieceSize / 2) {
         if (board.promoteWait) {
-            let direction = pieceAt(board, board.activePiece.x, board.activePiece.y).color === 'b' ? -1 : 1;
+            let direction = activePiece(board).color === 'b' ? -1 : 1;
             if (board.activePiece.x === pieceX) {
                 if (board.activePiece.y === pieceY) {
                     promote(board, false, false);
@@ -374,23 +512,28 @@ function handleClick(event) {
                     return;
                 }
             }
-        }
-        if (!board.promoteWait && !board.gameOver) {
-            if (pieceX >= 0 && pieceX < board.N && pieceY >= 0 && pieceY < board.N) {
-                if (activePiece(board) && legalMoves(board, board.activePiece.x, board.activePiece.y).some((move) => move[0] === pieceX && move[1] === pieceY)) {
-                    let startX = board.activePiece.x, startY = board.activePiece.y;
-                    setActive(board, startX, startY);
-                    movePiece(board, startX, startY, pieceX, pieceY);
-                    render();
-                    updateCursor(event);
-                    return;
-                }
-                if (pieceAt(board, pieceX, pieceY) !== 0) {
-                    setActive(board, pieceX, pieceY);
-                    render();
-                    updateCursor(event);
-                    return;
-                }
+        } else if (pieceX >= 0 && pieceX < board.N && pieceY >= 0 && pieceY < board.N) {
+            if (dropSelected(board) && legalDrops(board, dropPiece(board)).some((move) => move[0] === pieceX && move[1] === pieceY)) {
+                let drop = dropPiece(board);
+                setActive(board, board.activePiece.x, board.activePiece.y);
+                moveDropPiece(board, drop, pieceX, pieceY);
+                render();
+                updateCursor(event);
+                return;
+            }
+            if (pieceSelected(board) && legalMoves(board, board.activePiece.x, board.activePiece.y).some((move) => move[0] === pieceX && move[1] === pieceY)) {
+                let startX = board.activePiece.x, startY = board.activePiece.y;
+                setActive(board, startX, startY);
+                movePiece(board, startX, startY, pieceX, pieceY);
+                render();
+                updateCursor(event);
+                return;
+            }
+            if (pieceAt(board, pieceX, pieceY) !== 0) {
+                setActive(board, pieceX, pieceY);
+                render();
+                updateCursor(event);
+                return;
             }
         }
     }

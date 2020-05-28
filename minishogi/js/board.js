@@ -18,12 +18,24 @@ function setPiece(board, x, y, piece) {
     board.pieces[y][x] = piece;
 }
 
+export function pieceSelected(board) {
+    return board.activePiece.x >= 0 && board.activePiece.x < board.N && board.activePiece.y >= 0 && board.activePiece.y < board.N;
+}
+
+export function dropSelected(board) {
+    return board.activePiece.x >= board.N;
+}
+
+export function dropPiece(board) {
+    return new Piece(board.pieceNames[board.activePiece.y % board.pieceNames.length], board.activePiece.y >= board.pieceNames.length ? 'w' : 'b');
+}
+
 export function activePiece(board) {
-    return board.activePiece.x !== -1 || board.activePiece.y !== -1;
+    return pieceAt(board, board.activePiece.x, board.activePiece.y);
 }
 
 export function promote(board, prompt = true, promoted = true) {
-    let piece = pieceAt(board, board.activePiece.x, board.activePiece.y);
+    let piece = activePiece(board);
     if (!prompt || piece.type === 'p') {
         piece.promoted = promoted;
         board.promoteWait = false;
@@ -52,6 +64,12 @@ export function movePiece(board, pieceX, pieceY, x, y, test = false) {
     }
 }
 
+export function moveDropPiece(board, piece, x, y) {
+    board.inHand[piece.color][piece.type]--;
+    setPiece(board, x, y, piece);
+    checkCheckmate(board);
+}
+
 export function checkCheckmate(board) {
     if (inCheckmate(board, 'b')) {
         board.gameOver = true;
@@ -64,16 +82,24 @@ export function checkCheckmate(board) {
 }
 
 export function setActive(board, x, y) {
-    if (!activePiece(board)) {
+    if (!pieceSelected(board) && !dropSelected(board)) {
         board.activePiece = { x: x, y: y };
-        pieceAt(board, x, y).active = true;
+        if (x < board.N) {
+            pieceAt(board, x, y).active = true;
+        }
     } else if (board.activePiece.x === x && board.activePiece.y === y) {
         board.activePiece = { x: -1, y: -1 };
-        pieceAt(board, x, y).active = false;
+        if (x < board.N) {
+            pieceAt(board, x, y).active = false;
+        }
     } else {
-        pieceAt(board, board.activePiece.x, board.activePiece.y).active = false;
+        if (board.activePiece.x < board.N) {
+            activePiece(board).active = false;
+        }
         board.activePiece = { x: x, y: y };
-        pieceAt(board, x, y).active = true;
+        if (x < board.N) {
+            pieceAt(board, x, y).active = true;
+        }
     }
 }
 
@@ -105,6 +131,54 @@ function inCheckmate(board, color) {
         }
     }
     return true;
+}
+
+export function legalDrops(board, piece) {
+    let drops = [];
+
+    for (let x = 0; x < board.N; x++) {
+        if (piece.type === 'p') {
+            let pawnFound = false;
+            for (let y = 0; y < board.N; y++) {
+                if (pieceAt(board, x, y).type === 'p') {
+                    pawnFound = true;
+                }
+            }
+            if (pawnFound) {
+                continue;
+            }
+        }
+        for (let y = 0; y < board.N; y++) {
+            if (pieceAt(board, x, y) !== 0) {
+                continue;
+            }
+            if (piece.type === 'p') {
+                if (piece.color === 'b' && y === 0) {
+                    continue;
+                }
+                if (piece.color === 'w' && y === 4) {
+                    continue;
+                }
+                let dropBoard = JSON.parse(JSON.stringify(board));
+                moveDropPiece(dropBoard, piece, x, y, true);
+                if (dropBoard.gameOver) {
+                    continue;
+                }
+            }
+            drops.push([x, y]);
+        }
+    }
+
+    let legalDrops = [];
+    for (let [x, y] of drops) {
+        let dropBoard = JSON.parse(JSON.stringify(board));
+        moveDropPiece(dropBoard, piece, x, y);
+        if (!inCheck(dropBoard, piece.color)) {
+            legalDrops.push([x, y]);
+        }
+    }
+
+    return legalDrops;
 }
 
 export function legalMoves(board, pieceX, pieceY, strict = true) {
@@ -172,7 +246,7 @@ export function legalMoves(board, pieceX, pieceY, strict = true) {
     }
 
     // Filter out non-legal moves
-    let legalMoves = []
+    let legalMoves = [];
     for (let [x, y] of moves) {
         let moveBoard = JSON.parse(JSON.stringify(board));
         movePiece(moveBoard, pieceX, pieceY, x, y, true);
@@ -194,22 +268,21 @@ class Board {
             [new Piece('p', 'b'), 0, 0, 0, 0],
             [new Piece('k', 'b'), new Piece('g', 'b'), new Piece('s', 'b'), new Piece('b', 'b'), new Piece('r', 'b')]
         ];
+        this.pieceNames = ['p', 's', 'g', 'b', 'r'];
         this.inHand = {
             'b': {
-                'k': 0,
-                'r': 0,
-                'b': 0,
-                'g': 0,
+                'p': 0,
                 's': 0,
-                'p': 0
+                'g': 0,
+                'b': 0,
+                'r': 0
             },
             'w': {
-                'k': 0,
-                'r': 0,
-                'b': 0,
-                'g': 0,
+                'p': 0,
                 's': 0,
-                'p': 0
+                'g': 0,
+                'b': 0,
+                'r': 0
             }
         };
         this.activePiece = { x: -1, y: -1 };
