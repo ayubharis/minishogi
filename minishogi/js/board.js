@@ -140,7 +140,7 @@ export function legalDrops(board, piece) {
         if (piece.type === 'p') {
             let pawnFound = false;
             for (let y = 0; y < board.N; y++) {
-                if (pieceAt(board, x, y).type === 'p') {
+                if (pieceAt(board, x, y).type === 'p' && pieceAt(board, x, y).color === piece.color && !pieceAt(board, x, y).promoted) {
                     pawnFound = true;
                 }
             }
