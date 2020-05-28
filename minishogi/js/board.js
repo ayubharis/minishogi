@@ -136,7 +136,9 @@ function inCheckmate(board, color) {
 export function legalDrops(board, piece) {
     let drops = [];
 
+    // Accumulate pseudo-legal drops
     for (let x = 0; x < board.N; x++) {
+        // Same file two pawns illegal
         if (piece.type === 'p') {
             let pawnFound = false;
             for (let y = 0; y < board.N; y++) {
@@ -149,16 +151,16 @@ export function legalDrops(board, piece) {
             }
         }
         for (let y = 0; y < board.N; y++) {
+            // Drop on occupied square illegal
             if (pieceAt(board, x, y) !== 0) {
                 continue;
             }
             if (piece.type === 'p') {
-                if (piece.color === 'b' && y === 0) {
+                // Back rank pawn drop illegal
+                if ((piece.color === 'b' && y === 0) || (piece.color === 'w' && y === 4)) {
                     continue;
                 }
-                if (piece.color === 'w' && y === 4) {
-                    continue;
-                }
+                // Pawn drop checkmate illegal
                 let dropBoard = JSON.parse(JSON.stringify(board));
                 moveDropPiece(dropBoard, piece, x, y, true);
                 if (dropBoard.gameOver) {
@@ -169,6 +171,7 @@ export function legalDrops(board, piece) {
         }
     }
 
+    // Filter out non-legal drops
     let legalDrops = [];
     for (let [x, y] of drops) {
         let dropBoard = JSON.parse(JSON.stringify(board));
